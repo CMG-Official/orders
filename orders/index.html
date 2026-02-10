@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,25 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body {
-            background-color: #0f172a;
-            color: #e2e8f0;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-        }
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .card { background-color: #1e293b; border: 1px solid #334155; }
     </style>
 </head>
-
 <body class="flex items-center justify-center min-h-screen p-4">
 
     <div class="max-w-md w-full card rounded-xl shadow-2xl p-8" id="main-container">
         <div id="loading" class="text-center">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p class="text-slate-400">Fetching order details...?</p>
+            <p class="text-slate-400">Searching Database...</p>
         </div>
 
         <div id="content" class="hidden">
@@ -42,7 +32,7 @@
                     <span class="text-slate-400">Service Type</span>
                     <span id="service-type" class="font-semibold text-white">---</span>
                 </div>
-
+                
                 <div class="flex justify-between border-b border-slate-700 pb-2">
                     <span class="text-slate-400">Cost</span>
                     <span id="cost" class="font-semibold text-green-400">---</span>
@@ -57,32 +47,33 @@
                     <span class="text-slate-400">Created At</span>
                     <span id="date" class="text-slate-300">---</span>
                 </div>
-
+                
                 <div id="cancel-box" class="hidden mt-4 bg-red-900/20 border border-red-500/50 p-3 rounded">
                     <p class="text-red-400 text-xs uppercase font-bold mb-1">Cancellation Reason</p>
                     <p id="cancel-reason" class="text-red-200">---</p>
                 </div>
             </div>
-
+            
             <div class="mt-8 text-center">
                 <p class="text-xs text-slate-500">Atlantis Labs • Oaklands System</p>
             </div>
         </div>
 
         <div id="error" class="hidden text-center">
-            <p class="text-4xl mb-2">🔍</p>
+            <p class="text-4xl mb-2">⚠️</p>
             <h2 class="text-xl font-bold text-white">Order Not Found</h2>
-            <p class="text-slate-400 mt-2">The order ID you requested does not exist or has been removed.</p>
+            <div id="error-details" class="mt-4 p-3 bg-red-900/30 rounded text-left text-xs font-mono text-red-300 break-words">
+                </div>
         </div>
     </div>
 
     <script>
         // --- CONFIGURATION ---
-        // ⚠️ PASTE YOUR KEYS HERE
-        const SUPABASE_URL = "https://jvjloeioopumjecioiuu.supabase.co/orders";
+        // ✅ Your Keys are pre-filled below:
+        const SUPABASE_URL = "https://jvjloeioopumjecioiuu.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2amxvZWlvb3B1bWplY2lvaXV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3MDQ2ODEsImV4cCI6MjA4NjI4MDY4MX0.CeOeKjwIFElx9vDAM0i59lHaiBD1hgaWPtRP7cB6Hq0";
 
-        // FIX: Renamed variable to 'supabaseClient' to avoid conflict
+        // Initialize Supabase (renamed to 'supabaseClient' to avoid conflicts)
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function fetchOrder() {
@@ -91,19 +82,26 @@
             const orderId = params.get('id');
 
             if (!orderId) {
-                showError();
+                showError("No Order ID provided in URL.\nTry adding ?id=123 to the end of your link.");
                 return;
             }
 
-            // 2. Query Supabase using the new variable name
+            console.log("Searching for Order ID:", orderId);
+
+            // 2. Query Supabase
             const { data, error } = await supabaseClient
                 .from('orders')
                 .select('*')
                 .eq('id', orderId)
                 .single();
 
-            if (error || !data) {
-                showError();
+            // 3. Handle Result
+            if (error) {
+                console.error("Supabase Error:", error);
+                // Show specific database error on screen
+                showError(`Database Error: ${error.message}\n(Code: ${error.code})`);
+            } else if (!data) {
+                showError(`Order #${orderId} does not exist in the database.`);
             } else {
                 renderOrder(data);
             }
@@ -115,15 +113,19 @@
 
             // Fill Text
             document.getElementById('order-id').innerText = order.id;
-            document.getElementById('service-type').innerText = order.service_type;
-            document.getElementById('cost').innerText = order.cost;
+            document.getElementById('service-type').innerText = order.service_type || "N/A";
+            document.getElementById('cost').innerText = order.cost || "$0";
             document.getElementById('customer-id').innerText = order.customer_id;
             
-            // Format Date
-            const date = new Date(order.created_at).toLocaleDateString("en-US", { 
-                year: 'numeric', month: 'long', day: 'numeric' 
-            });
-            document.getElementById('date').innerText = date;
+            // Format Date safely
+            try {
+                const date = new Date(order.created_at).toLocaleDateString("en-US", { 
+                    year: 'numeric', month: 'long', day: 'numeric' 
+                });
+                document.getElementById('date').innerText = date;
+            } catch(e) {
+                document.getElementById('date').innerText = "Unknown Date";
+            }
 
             // Status Styling
             const badge = document.getElementById('status-badge');
@@ -136,18 +138,18 @@
                 
                 // Show reason
                 document.getElementById('cancel-box').classList.remove('hidden');
-                document.getElementById('cancel-reason').innerText = order.cancellation_reason;
+                document.getElementById('cancel-reason').innerText = order.cancellation_reason || "No reason provided";
             }
         }
 
-        function showError() {
+        function showError(message) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('error').classList.remove('hidden');
+            document.getElementById('error-details').innerText = message;
         }
 
         // Run on load
         fetchOrder();
     </script>
 </body>
-
 </html>
