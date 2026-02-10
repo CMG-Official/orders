@@ -1,148 +1,209 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<style>
-    /* Styling for the Card */
-    .order-card {
-        background: #fff;
-        border: 1px solid #ddd;
-        padding: 15px;
-        margin-bottom: 10px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        font-family: sans-serif;
-    }
-
-    /* Customer Info Section */
-    .customer-info {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        min-width: 200px;
-    }
-
-    .pfp-img {
-        width: 45px;
-        height: 45px;
-        border-radius: 50%;
-        background-color: #eee;
-        object-fit: cover;
-        border: 2px solid #fff;
-        box-shadow: 0 0 0 1px #ddd;
-    }
-
-    .user-details {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .username-text { font-weight: 700; color: #333; }
-    .userid-text { font-size: 0.8em; color: #888; }
-
-    /* Buttons */
-    .btn-group { display: flex; gap: 8px; }
-
-    .btn-complete {
-        background-color: #2ecc71; /* Green */
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    .btn-complete:hover { background-color: #27ae60; }
-
-    .btn-cancel {
-        background-color: #fff;
-        color: #e74c3c;
-        border: 1px solid #e74c3c;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    .btn-cancel:hover { background-color: #fceceb; }
-
-</style>
-</head>
-<body>
-
-<div class="order-card" id="order-123">
-    
-    <div class="customer-info">
-        <img src="https://tr.rbxcdn.com/53eb9b17fe1432a809c73a134d423984/150/150/AvatarHeadshot/Png" 
-             id="pfp-12345678" 
-             class="pfp-img" 
-             alt="User">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Status | Atlantis Labs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .card { background-color: #1e293b; border: 1px solid #334155; }
         
-        <div class="user-details">
-            <span class="username-text" id="name-12345678">Loading...</span>
-            <span class="userid-text">ID: 12345678</span>
+        /* Smooth fade in for PFP */
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="max-w-md w-full card rounded-xl shadow-2xl p-8" id="main-container">
+        <div id="loading" class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p class="text-slate-400">Searching Database...</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-white mb-1">Order #<span id="order-id">---</span></h1>
+                <span id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-300">
+                    LOADING
+                </span>
+            </div>
+
+            <div class="space-y-4 text-sm">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <span class="text-slate-400">Service Type</span>
+                    <span id="service-type" class="font-semibold text-white">---</span>
+                </div>
+                
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <span class="text-slate-400">Cost</span>
+                    <span id="cost" class="font-semibold text-green-400">---</span>
+                </div>
+
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <span class="text-slate-400">Customer</span>
+                    
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <div id="customer-name" class="font-semibold text-white leading-tight">Loading...</div>
+                            <div id="customer-id" class="text-xs text-slate-500 font-mono">---</div>
+                        </div>
+                        <img id="customer-pfp" src="" alt="Profile" class="w-10 h-10 rounded-full bg-slate-700 object-cover border border-slate-600 hidden">
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <span class="text-slate-400">Created At</span>
+                    <span id="date" class="text-slate-300">---</span>
+                </div>
+                
+                <div id="cancel-box" class="hidden mt-4 bg-red-900/20 border border-red-500/50 p-3 rounded">
+                    <p class="text-red-400 text-xs uppercase font-bold mb-1">Cancellation Reason</p>
+                    <p id="cancel-reason" class="text-red-200">---</p>
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center">
+                <p class="text-xs text-slate-500">Atlantis Labs • Oaklands System</p>
+            </div>
+        </div>
+
+        <div id="error" class="hidden text-center">
+            <p class="text-4xl mb-2">⚠️</p>
+            <h2 class="text-xl font-bold text-white">Order Not Found</h2>
+            <div id="error-details" class="mt-4 p-3 bg-red-900/30 rounded text-left text-xs font-mono text-red-300 break-words">
+            </div>
         </div>
     </div>
 
-    <div class="status-display">
-        <span id="badge-123">In Progress</span>
-    </div>
+    <script>
+        // --- CONFIGURATION ---
+        const SUPABASE_URL = "https://jvjloeioopumjecioiuu.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2amxvZWlvb3B1bWplY2lvaXV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3MDQ2ODEsImV4cCI6MjA4NjI4MDY4MX0.CeOeKjwIFElx9vDAM0i59lHaiBD1hgaWPtRP7cB6Hq0";
 
-    <div class="btn-group">
-        <button class="btn-complete" onclick="changeStatus('123', 'Completed')">
-            ✅ Complete
-        </button>
-        <button class="btn-cancel" onclick="changeStatus('123', 'Canceled')">
-            ✖ Cancel
-        </button>
-    </div>
-</div>
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-<script>
-    // 1. Fetch Roblox Profile Data automatically
-    async function loadRobloxData(robloxId) {
-        try {
-            // Get PFP
-            const pfpReq = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`);
-            const pfpRes = await pfpReq.json();
-            if(pfpRes.data && pfpRes.data[0]) {
-                document.getElementById(`pfp-${robloxId}`).src = pfpRes.data[0].imageUrl;
+        // --- ROBLOX API FETCHER ---
+        async function fetchRobloxProfile(robloxId) {
+            try {
+                // 1. Fetch PFP (Headshot)
+                const pfpRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`);
+                const pfpData = await pfpRes.json();
+                
+                // 2. Fetch Username
+                const userRes = await fetch(`https://users.roblox.com/v1/users/${robloxId}`);
+                const userData = await userRes.json();
+
+                // 3. Update UI
+                if (pfpData.data && pfpData.data.length > 0) {
+                    const img = document.getElementById('customer-pfp');
+                    img.src = pfpData.data[0].imageUrl;
+                    img.classList.remove('hidden');
+                    img.classList.add('fade-in');
+                }
+                
+                if (userData.name) {
+                    document.getElementById('customer-name').innerText = userData.name;
+                } else {
+                    document.getElementById('customer-name').innerText = "Unknown User";
+                }
+
+            } catch (error) {
+                console.error("Roblox API Error:", error);
+                document.getElementById('customer-name').innerText = "API Error";
             }
-
-            // Get Username
-            const userReq = await fetch(`https://users.roblox.com/v1/users/${robloxId}`);
-            const userRes = await userReq.json();
-            if(userRes.name) {
-                document.getElementById(`name-${robloxId}`).innerText = userRes.name;
-            }
-        } catch (e) {
-            console.error("Roblox API Error:", e);
-            document.getElementById(`name-${robloxId}`).innerText = "Unknown User";
-        }
-    }
-
-    // 2. Handle Status Change
-    function changeStatus(orderId, status) {
-        if(!confirm(`Mark order #${orderId} as ${status}?`)) return;
-
-        // Visual update immediately
-        const badge = document.getElementById(`badge-${orderId}`);
-        badge.innerText = status;
-        
-        if (status === 'Completed') {
-            document.getElementById(`order-${orderId}`).style.opacity = "0.6"; // Dim completed orders
         }
 
-        // Send to Backend (Replace with your actual endpoint)
-        console.log(`Sending to backend: ID=${orderId}, Status=${status}`);
-        // fetch('/api/update', { method: 'POST', body: JSON.stringify({id: orderId, status: status}) });
-    }
+        async function fetchOrder() {
+            const params = new URLSearchParams(window.location.search);
+            const orderId = params.get('id');
 
-    // Initialize (Call this for every order in your list)
-    loadRobloxData(12345678); 
-</script>
+            if (!orderId) {
+                showError("No Order ID provided in URL.\nTry adding ?id=123 to the end of your link.");
+                return;
+            }
 
+            console.log("Searching for Order ID:", orderId);
+
+            const { data, error } = await supabaseClient
+                .from('orders')
+                .select('*')
+                .eq('id', orderId)
+                .single();
+
+            if (error) {
+                console.error("Supabase Error:", error);
+                showError(`Database Error: ${error.message}\n(Code: ${error.code})`);
+            } else if (!data) {
+                showError(`Order #${orderId} does not exist in the database.`);
+            } else {
+                renderOrder(data);
+            }
+        }
+
+        function renderOrder(order) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            // Basic Text
+            document.getElementById('order-id').innerText = order.id;
+            document.getElementById('service-type').innerText = order.service_type || "N/A";
+            document.getElementById('cost').innerText = order.cost || "$0";
+            document.getElementById('customer-id').innerText = `ID: ${order.customer_id}`;
+            
+            // Trigger Roblox Fetch
+            fetchRobloxProfile(order.customer_id);
+
+            // Date Formatting
+            try {
+                const date = new Date(order.created_at).toLocaleDateString("en-US", { 
+                    year: 'numeric', month: 'long', day: 'numeric' 
+                });
+                document.getElementById('date').innerText = date;
+            } catch(e) {
+                document.getElementById('date').innerText = "Unknown Date";
+            }
+
+            // --- STATUS LOGIC (Updated for 3 States) ---
+            const badge = document.getElementById('status-badge');
+            const status = order.status; // Expected: "In Progress", "Completed", "Canceled"
+            
+            badge.innerText = status;
+            
+            // Reset classes
+            badge.className = "px-3 py-1 rounded-full text-sm font-bold border";
+
+            if (status === 'Completed') {
+                // Green
+                badge.classList.add("bg-green-500/20", "text-green-400", "border-green-500/50");
+            } 
+            else if (status === 'In Progress') {
+                // Yellow / Orange
+                badge.classList.add("bg-yellow-500/20", "text-yellow-400", "border-yellow-500/50");
+            } 
+            else if (status === 'Canceled') {
+                // Red
+                badge.classList.add("bg-red-500/20", "text-red-400", "border-red-500/50");
+                
+                // Show Reason
+                document.getElementById('cancel-box').classList.remove('hidden');
+                document.getElementById('cancel-reason').innerText = order.cancellation_reason || "No reason provided";
+            } 
+            else {
+                // Default (Gray) for unknown statuses
+                badge.classList.add("bg-gray-700", "text-gray-300", "border-gray-600");
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.remove('hidden');
+            document.getElementById('error-details').innerText = message;
+        }
+
+        fetchOrder();
+    </script>
 </body>
 </html>
