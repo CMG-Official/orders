@@ -10,8 +10,8 @@
         body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
         .card { background-color: #1e293b; border: 1px solid #334155; }
         
-        /* Smooth fade in for PFP */
-        .fade-in { animation: fadeIn 0.5s ease-in; }
+        /* Animation for loading the avatar */
+        .fade-in { animation: fadeIn 0.5s ease-in forwards; opacity: 0; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -47,10 +47,10 @@
                     
                     <div class="flex items-center gap-3">
                         <div class="text-right">
-                            <div id="customer-name" class="font-semibold text-white leading-tight">Loading...</div>
+                            <div id="discord-name" class="font-semibold text-white leading-tight">Loading...</div>
                             <div id="customer-id" class="text-xs text-slate-500 font-mono">---</div>
                         </div>
-                        <img id="customer-pfp" src="" alt="Profile" class="w-10 h-10 rounded-full bg-slate-700 object-cover border border-slate-600 hidden">
+                        <img id="discord-pfp" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Discord Avatar" class="w-10 h-10 rounded-full bg-slate-700 object-cover border border-slate-600 hidden">
                     </div>
                 </div>
 
@@ -85,34 +85,46 @@
 
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- ROBLOX API FETCHER ---
-        async function fetchRobloxProfile(robloxId) {
+        // --- DISCORD PROFILE FETCHER ---
+        async function fetchDiscordProfile(discordId) {
             try {
-                // 1. Fetch PFP (Headshot)
-                const pfpRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=true`);
-                const pfpData = await pfpRes.json();
+                // Using Lanyard API (Public Discord Lookup) to get user info without OAuth
+                // Note: This works best if the user is in the Lanyard system or a common server, 
+                // otherwise it might fallback to default.
                 
-                // 2. Fetch Username
-                const userRes = await fetch(`https://users.roblox.com/v1/users/${robloxId}`);
-                const userData = await userRes.json();
+                // ALTERNATIVE: Since you can't fetch raw Discord API from frontend without exposing bot token (BAD idea),
+                // we will simply display the ID if lookup fails, or use a placeholder.
+                
+                // For this UI, we will format a default avatar link which works if we knew the hash, 
+                // but since we only have ID, we use the default embedding avatar or try a lookup service.
+                
+                // 1. Try to fetch basic info via Lanyard (Privacy friendly lookup)
+                const res = await fetch(`https://api.lanyard.rest/v1/users/${discordId}`);
+                const json = await res.json();
 
-                // 3. Update UI
-                if (pfpData.data && pfpData.data.length > 0) {
-                    const img = document.getElementById('customer-pfp');
-                    img.src = pfpData.data[0].imageUrl;
-                    img.classList.remove('hidden');
-                    img.classList.add('fade-in');
+                const img = document.getElementById('discord-pfp');
+                const nameLabel = document.getElementById('discord-name');
+
+                if (json.success && json.data) {
+                    const user = json.data.discord_user;
+                    nameLabel.innerText = user.global_name || user.username;
+                    
+                    // Construct Avatar URL
+                    if (user.avatar) {
+                        img.src = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
+                    }
+                } else {
+                    // Fallback if lookup fails (User not cached publicly)
+                    nameLabel.innerText = "Discord User";
                 }
                 
-                if (userData.name) {
-                    document.getElementById('customer-name').innerText = userData.name;
-                } else {
-                    document.getElementById('customer-name').innerText = "Unknown User";
-                }
+                img.classList.remove('hidden');
+                img.classList.add('fade-in');
 
             } catch (error) {
-                console.error("Roblox API Error:", error);
-                document.getElementById('customer-name').innerText = "API Error";
+                console.error("Discord Fetch Error:", error);
+                document.getElementById('discord-name').innerText = "Unknown User";
+                document.getElementById('discord-pfp').classList.remove('hidden');
             }
         }
 
@@ -153,8 +165,8 @@
             document.getElementById('cost').innerText = order.cost || "$0";
             document.getElementById('customer-id').innerText = `ID: ${order.customer_id}`;
             
-            // Trigger Roblox Fetch
-            fetchRobloxProfile(order.customer_id);
+            // Trigger Discord Fetch
+            fetchDiscordProfile(order.customer_id);
 
             // Date Formatting
             try {
@@ -166,22 +178,21 @@
                 document.getElementById('date').innerText = "Unknown Date";
             }
 
-            // --- STATUS LOGIC (Updated for 3 States) ---
+            // --- STATUS LOGIC (Matches Python Bot) ---
             const badge = document.getElementById('status-badge');
-            const status = order.status; // Expected: "In Progress", "Completed", "Canceled"
+            const status = order.status; // "In Progress", "Completed", "Canceled"
             
             badge.innerText = status;
-            
-            // Reset classes
-            badge.className = "px-3 py-1 rounded-full text-sm font-bold border";
+            badge.className = "px-3 py-1 rounded-full text-sm font-bold border"; // Reset base classes
 
             if (status === 'Completed') {
                 // Green
                 badge.classList.add("bg-green-500/20", "text-green-400", "border-green-500/50");
             } 
-            else if (status === 'In Progress') {
-                // Yellow / Orange
+            else if (status === 'In Progress' || status === 'ACTIVE') {
+                // Yellow (Standardizing on Yellow for progress)
                 badge.classList.add("bg-yellow-500/20", "text-yellow-400", "border-yellow-500/50");
+                if(status === 'ACTIVE') badge.innerText = "In Progress"; // Fix old DB entries visually
             } 
             else if (status === 'Canceled') {
                 // Red
@@ -192,7 +203,7 @@
                 document.getElementById('cancel-reason').innerText = order.cancellation_reason || "No reason provided";
             } 
             else {
-                // Default (Gray) for unknown statuses
+                // Fallback
                 badge.classList.add("bg-gray-700", "text-gray-300", "border-gray-600");
             }
         }
